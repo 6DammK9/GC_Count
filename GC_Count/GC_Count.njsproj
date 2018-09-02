@@ -29,6 +29,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="app.js" />
+    <Content Include="gc_count.html" />
+    <Content Include="gc_count_chart.html" />
     <Content Include="package.json" />
     <Content Include="README.md" />
   </ItemGroup>
