@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title> GC Count </title>
+</head>
+<body>
+    <h1> GC Count </h1>
+    <p>Goto <a href="https://mypage.groovecoaster.jp/sp/json/music_list.php">this link</a>, and input below.</p>
+    <textarea rows="4" cols="50" id="myTextarea"> </textarea>
+    <br>
+    <button type="button" onclick="Count_GC()">Click Me!</button>
+    <br>
+    <h1 id="result" />
+    <script>
+        var Count_GC = function () {
+            try {
+                document.getElementById("result").innerHTML =
+                    JSON.parse(document.getElementById("myTextarea").value)
+                        .music_list
+                        .map(e => e.play_count)
+                        .reduce((a, b) => a + b)
+                    ;
+            } catch (e) {
+                document.getElementById("result").innerHTML = "invalid input";
+            }
+        };
+    </script>
+</body>
+</html>

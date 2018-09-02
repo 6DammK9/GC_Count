@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title> GC Count </title>
+    <script src="http://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.2/Chart.min.js"></script>
+    <style>
+        html {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #888;
+        }
+
+        #myChart {
+            background-color: #ccc;
+        }
+    </style>
+</head>
+<body>
+    <h1> GC Count </h1>
+    <p>Goto <a href="https://mypage.groovecoaster.jp/sp/json/music_list.php">this link</a>, and input below.</p>
+    <textarea rows="4" cols="50" id="myTextarea"> </textarea>
+    <br>
+    <span>min</span><input type="text" id="index_min" value="0" maxlength="4" size="4">
+    <span>max</span><input type="text" id="index_max" value="9999" maxlength="4" size="4">
+    <button type="button" onclick="Count_GC()">Click Me!</button>
+    <br>
+    <h1 id="result" />
+    <div style="width:80%;">
+        <canvas id="myChart"></canvas>
+    </div>
+
+    <script>
+
+        var raw_gc_json = null;
+        var sort_gc_count = function (o, k) {
+            var min = parseInt(document.getElementById("index_min").value);
+            var max = parseInt(document.getElementById("index_max").value);
+            min = isNaN(min) ? 0 : min;
+            max = isNaN(max) ? 9999 : max;
+            min = min > max ? max : min;
+            return o.music_list.filter(d => d.play_count >= min && d.play_count <= max).sort((a, b) => { return a[k] - b[k]; });
+        };
+
+        var find_sum = function (o) {
+            return o.music_list.map(e => e.play_count).reduce((a, b) => a + b);
+        };
+
+        var plot_chart = function (o) {
+            var o_sorted = {
+                "play_count": sort_gc_count(o, "play_count"),
+                //"last_play_time": sort_gc_count(o, "last_play_time")
+            };
+
+            console.log(o_sorted["play_count"]);
+            ///console.log([
+            //    document.getElementById("index_min").value,
+            //    document.getElementById("index_max").value
+            //]);
+
+            window.gc_chart_config = {
+                type: 'line',
+                data: {
+                    labels: o_sorted["play_count"].map(o => `${o.music_title}`),
+                    datasets: [{
+                        label: 'Play count',
+                        backgroundColor: 'rgba(255, 0, 255, 0.125)',
+                        borderColor: 'rgba(255, 0, 255, 0.125)',
+                        data: o_sorted["play_count"].map(o => o.play_count),
+                        fill: false
+                    }]
+                    //{
+                    //	label: 'Sorted by last played',
+                    //	backgroundColor: window.chartColors.blue,
+                    //	borderColor: window.chartColors.blue,
+                    //	data:  o_sorted["last_play_time"].map(o=>o.play_count),
+                    //	fill: false
+                    //}
+
+                },
+                options: {
+                    responsive: true,
+                    title: {
+                        display: true,
+                        text: `GC Play Counts (Total = ${find_sum(o)})`
+                    },
+                    tooltips: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    hover: {
+                        mode: 'nearest',
+                        intersect: true
+                    },
+                    scales: {
+                        xAxes: [{
+                            display: true,
+                            scaleLabel: {
+                                display: true,
+                                labelString: `Rank out of ${o.music_list.length} songs`
+                            }
+                        }],
+                        yAxes: [{
+                            display: true,
+                            scaleLabel: {
+                                display: true,
+                                labelString: 'Play Count'
+                            }
+                        }]
+                    }
+                }
+            };
+
+            console.log(window.gc_chart);
+
+            if (window.gc_chart) {
+                window.gc_chart.config.data = window.gc_chart_config.data;
+                window.gc_chart.update();
+            } else {
+                window.gc_chart = new Chart(document.getElementById("myChart").getContext('2d'), window.gc_chart_config);
+            }
+        };
+
+        var Count_GC = function () {
+            try {
+                raw_gc_json = JSON.parse(document.getElementById("myTextarea").value);
+                //document.getElementById("result").innerHTML = find_sum(raw_gc_json);
+                plot_chart(raw_gc_json);
+            } catch (e) {
+                console.log(e);
+                //document.getElementById("result").innerHTML = "invalid input";
+            }
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "name": "gc_count",
+  "version": "0.0.0",
+  "description": "GC_Count",
+  "main": "app.js",
+  "author": {
+    "name": "lauts"
+  }
+}
