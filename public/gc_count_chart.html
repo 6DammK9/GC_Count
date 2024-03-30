@@ -1,8 +1,11 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <title> GC Count </title>
-    <script src="http://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.2/Chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"
+        integrity="sha512-ZwR1/gSZM3ai6vCdI+LVF1zSq/5HznD3ZSTk7kajkaj4D292NLuduDCO1c/NT8Id+jE58KYLKT7hXnbtryGmMg=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <style>
         html {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -14,6 +17,7 @@
         }
     </style>
 </head>
+
 <body>
     <h1> GC Count </h1>
     <p>Goto <a href="https://mypage.groovecoaster.jp/sp/json/music_list.php">this link</a>, and input below.</p>
@@ -21,7 +25,7 @@
     <br>
     <span>min</span><input type="text" id="index_min" value="0" maxlength="4" size="4">
     <span>max</span><input type="text" id="index_max" value="9999" maxlength="4" size="4">
-    <button type="button" onclick="Count_GC()">Click Me!</button>
+    <button type="button" onclick="count_gc_main()">Click Me!</button>
     <br>
     <h1 id="result" />
     <div style="width:80%;">
@@ -30,8 +34,6 @@
 
     <script>
         //ref: https://github.com/dstil/gini/blob/master/index.js
-
-        "use strict";
 
         window.gini = {};
 
@@ -147,7 +149,7 @@
                 //"last_play_time": sort_gc_count(o, "last_play_time")
             };
 
-            console.log(o_sorted["play_count"]);
+            console.log({ play_count: o_sorted["play_count"] });
             ///console.log([
             //    document.getElementById("index_min").value,
             //    document.getElementById("index_max").value
@@ -171,7 +173,6 @@
                     //	data:  o_sorted["last_play_time"].map(o=>o.play_count),
                     //	fill: false
                     //}
-
                 },
                 options: {
                     responsive: true,
@@ -188,25 +189,25 @@
                         intersect: true
                     },
                     scales: {
-                        xAxes: [{
+                        x: {
                             display: true,
-                            scaleLabel: {
+                            title: {
                                 display: true,
-                                labelString: `Rank out of ${o.music_list.length} songs`
+                                text: `Rank out of ${o.music_list.length} songs`
                             }
-                        }],
-                        yAxes: [{
+                        },
+                        y: {
                             display: true,
-                            scaleLabel: {
+                            title: {
                                 display: true,
                                 labelString: 'Play Count'
                             }
-                        }]
+                        }
                     }
                 }
             };
 
-            console.log(window.gc_chart);
+            console.log({ gc_chart: window.gc_chart });
 
             if (window.gc_chart) {
                 window.gc_chart.config.data = window.gc_chart_config.data;
@@ -216,16 +217,26 @@
             }
         };
 
-        var Count_GC = function () {
+        async function count_gc_main() {
             try {
-                raw_gc_json = JSON.parse(document.getElementById("myTextarea").value);
-                //document.getElementById("result").innerHTML = find_sum(raw_gc_json);
-                plot_chart(raw_gc_json);
+                const localDataPkg = await fetch("./scores/music_list.json");
+                const localData = await localDataPkg.json();
+                plot_chart(localData);
             } catch (e) {
-                console.log(e);
-                //document.getElementById("result").innerHTML = "invalid input";
+                console.error(e);
+                try {
+                    raw_gc_json = JSON.parse(document.getElementById("myTextarea").value);
+                    //document.getElementById("result").innerHTML = find_sum(raw_gc_json);
+                    plot_chart(raw_gc_json);
+                } catch (e2) {
+                    console.error(e2);
+                    //document.getElementById("result").innerHTML = "invalid input";
+                }
             }
         };
+
+        count_gc_main().catch(console.error);
     </script>
 </body>
+
 </html>

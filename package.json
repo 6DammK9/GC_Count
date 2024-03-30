@@ -1,0 +1,23 @@
+{
+  "name": "gc_count",
+  "version": "0.0.1",
+  "description": "Groove Coaster personal score archive.",
+  "main": "app.js",
+  "author": {
+    "name": "DammK"
+  },
+  "type": "module",
+  "imports": {
+    "#*": "./src/*"
+  },
+  "license": "MIT",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "mkdirp": "^3.0.1",
+    "node-fetch": "^3.3.2",
+    "open": "^10.1.0"
+  }
+}

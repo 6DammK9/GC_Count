@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title> GC Count </title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"
+        integrity="sha512-ZwR1/gSZM3ai6vCdI+LVF1zSq/5HznD3ZSTk7kajkaj4D292NLuduDCO1c/NT8Id+jE58KYLKT7hXnbtryGmMg=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <style>
+        html {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #888;
+        }
+
+        #myChart {
+            background-color: #ccc;
+        }
+    </style>
+</head>
+
+<body>
+    <h3> GC Count </h3>
+    <p>Goto <a href="https://mypage.groovecoaster.jp/sp/json/music_list.php">this link</a>, and input below. Author: <a
+            href="https://github.com/6DammK9/GC_Count">DammK</a></p>
+    <div id="load-status"></div>
+    <div style="display:none">
+        <textarea rows="4" cols="50" id="myTextarea"> </textarea>
+        <br>
+        <span>min</span><input type="text" id="index_min" value="0" maxlength="4" size="4">
+        <span>max</span><input type="text" id="index_max" value="9999" maxlength="4" size="4">
+        <button type="button" onclick="fallback_to_old_version()">Click Me!</button>
+        <br>
+    </div>
+    <div id="result"></div>
+    <div style="width:80%;">
+        <canvas id="myChart"></canvas>
+    </div>
+
+    <script>
+        //ref: https://github.com/dstil/gini/blob/master/index.js
+
+        window.gini = {};
+
+        window.gini.ordered = function (data) {
+            if (!Array.isArray(data)) {
+                throw new Error("Data set is not an array.");
+            }
+
+            if (data.length <= 0) {
+                throw new Error("Data set is an empty array.");
+            }
+
+            var sum1 = 0;
+            var sum2 = 0;
+            var previousValue;
+
+            for (var i = 0; i < data.length; i++) {
+                var value = Number(data[i]);
+
+                if (isNaN(value)) {
+                    throw new Error("Data set contains non-numbers.");
+                }
+
+                if (value < 0) {
+                    throw new Error("Data set contains negative numbers.");
+                }
+
+                if (i > 0 && value < previousValue) {
+                    throw new Error("Data set is not ordered ascendingly.");
+                }
+
+                sum1 += ((2 * (i + 1)) - data.length - 1) * value;
+                sum2 += value;
+                previousValue = value;
+            }
+
+            if (sum2 == 0) {
+                return 0; // If data set contains only zeroes, the equation further below won't work.
+            }
+
+            return sum1 / (Math.pow(data.length, 2) * (sum2 / data.length));
+        };
+
+        window.gini.unordered = function (data) {
+            if (!Array.isArray(data)) {
+                throw new Error("Data set is not an array.");
+            }
+
+            if (data.length <= 0) {
+                throw new Error("Data set is an empty array.");
+            }
+
+            data = data.map(function (value) {
+                value = Number(value);
+
+                if (isNaN(value)) {
+                    throw new Error("Data set contains non-numbers.");
+                }
+
+                if (value < 0) {
+                    throw new Error("Data set contains negative numbers.");
+                }
+
+                return value;
+            });
+
+            var sum1 = 0;
+            var sum2 = 0;
+
+            for (var i = 0; i < data.length; i++) {
+                for (var j = 0; j < data.length; j++) {
+                    if (i != j) {
+                        sum1 += Math.abs(data[i] - data[j]);
+                    }
+                }
+
+                sum2 += data[i];
+            }
+
+            if (sum2 == 0) {
+                return 0; // If data set contains only zeroes, the equation further below won't work.
+            }
+
+            return sum1 / (2 * Math.pow(data.length, 2) * (sum2 / data.length));
+        };
+    </script>
+
+
+    <script>
+        "use strict";
+
+        var raw_gc_json = null;
+        var sort_gc_count = function (o, k) {
+            var min = parseInt(document.getElementById("index_min").value);
+            var max = parseInt(document.getElementById("index_max").value);
+            min = isNaN(min) ? 0 : min;
+            max = isNaN(max) ? 9999 : max;
+            min = min > max ? max : min;
+            return o.music_list.filter(d => d.play_count >= min && d.play_count <= max).sort((a, b) => { return a[k] - b[k]; });
+        };
+
+        var find_sum = function (o) {
+            return o.music_list.map(e => e.play_count).reduce((a, b) => a + b);
+        };
+
+        var find_gini = function (o) {
+            return window.gini ? window.gini.unordered(o.music_list.map(e => e.play_count)).toFixed(4) : null;
+        };
+
+        var parseResultData = function (d) {
+            if (!d) return '';
+            let status = "NOT PLAYED";
+            if (d?.is_failed_mark) status = "FAIL";
+            if (d?.is_clear_mark) status = "CLEAR";
+            if (d?.no_miss > 0) status = "NO MISS";
+            if (d?.full_chain > 0) status = "FULL CHAIN";
+            if (d?.perfect > 0) status = "PERFECT";
+            return `Count: ${d?.play_count || ''}, Status: ${d?.status || ''}, Rating: ${d?.rating || ''}, Score: ${d?.score || ''}, Adlib: ${d?.adlib || ''}, Chain: ${d?.max_chain || ''}`
+        }
+
+        var parseMusicDetail = function (d) {
+            if (!d) return '';
+            return [
+                "SIMPLE: " + parseResultData(d?.simple_result_data),
+                "NORMAL: " + parseResultData(d?.normal_result_data),
+                "HARD__: " + parseResultData(d?.hard_result_data),
+                "EXTRA_: " + parseResultData(d?.extra_result_data),
+            ];
+        }
+
+        var plot_chart = function (musicListWithDdetail, playerData) {
+            var o_sorted = {
+                "play_count": sort_gc_count(musicListWithDdetail, "play_count"),
+                //"last_play_time": sort_gc_count(musicListWithDdetail, "last_play_time")
+            };
+
+            console.log({ play_count: o_sorted["play_count"] });
+            ///console.log([
+            //    document.getElementById("index_min").value,
+            //    document.getElementById("index_max").value
+            //]);
+
+            const { player_data, stage } = playerData;
+            const { player_name, total_score, total_music, total_play_music, average_score } = player_data;
+
+            var chartTitle = [
+                `Player: ${player_name}, Score: ${total_score}, Avg: ${average_score}, Music: ${total_play_music}/${total_music}`,
+                `Stage: ${JSON.stringify(stage)}`, //Lazy to format.
+                `Count: ${find_sum(musicListWithDdetail)}, Gini = ${window.gini ? find_gini(musicListWithDdetail) : ''})`
+            ];
+
+            window.gc_chart_config = {
+                type: 'line',
+                data: {
+                    //labels: o_sorted["play_count"].map(o => `${o.music_title}`),
+                    datasets: [{
+                        label: 'Play count',
+                        backgroundColor: 'rgba(255, 0, 255, 0.125)',
+                        borderColor: 'rgba(255, 0, 255, 0.125)',
+                        data: o_sorted["play_count"],//.map(o => o.play_count),
+                        fill: false
+                    }]
+                    //{
+                    //	label: 'Sorted by last played',
+                    //	backgroundColor: window.chartColors.blue,
+                    //	borderColor: window.chartColors.blue,
+                    //	data:  o_sorted["last_play_time"].map(o=>o.play_count),
+                    //	fill: false
+                    //}
+                },
+                options: {
+                    responsive: true,
+                    parsing: {
+                        xAxisKey: 'music_title',
+                        yAxisKey: 'play_count'
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: `Rank out of ${musicListWithDdetail.music_list.length} songs`
+                            }
+                        },
+                        y: {
+                            display: true,
+                            title: {
+                                display: true,
+                                labelString: 'Play Count'
+                            }
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: chartTitle,
+                        },
+                        tooltip: {
+                            callbacks: {
+                                afterLabel: (tooltipItem) => {
+                                    //console.log(tooltipItem);
+                                    return parseMusicDetail(tooltipItem?.raw?.music_detail);
+                                },
+                            }
+                        }
+                    }
+                }
+            };
+
+            console.log({ gc_chart: window.gc_chart });
+
+            if (window.gc_chart) {
+                window.gc_chart.config.data = window.gc_chart_config.data;
+                window.gc_chart.update();
+            } else {
+                window.gc_chart = new Chart(document.getElementById("myChart").getContext('2d'), window.gc_chart_config);
+            }
+        };
+
+        function fallback_to_old_version() {
+            try {
+                raw_gc_json = JSON.parse(document.getElementById("myTextarea").value);
+                //document.getElementById("result").innerHTML = find_sum(raw_gc_json);
+                plot_chart(raw_gc_json);
+            } catch (e) {
+                console.error(e);
+                //document.getElementById("result").innerHTML = "invalid input";
+            }
+        }
+
+        async function count_gc_main() {
+            try {
+                const tS = new Date();
+
+                document.getElementById("load-status").innerHTML = "Loading player_data";
+
+                const localPlayerDataPkg = await fetch(`./scores/player_data.json`);
+                const localPlayerData = await localPlayerDataPkg.json();
+
+                document.getElementById("load-status").innerHTML = "Loading music_list";
+
+                const localMusicListPkg = await fetch(`./scores/music_list.json`);
+                const localMusicList = await localMusicListPkg.json();
+
+                const { music_list } = localMusicList;
+                for (let i = 0; i < music_list.length; i++) {
+                    document.getElementById("load-status").innerHTML = `Loading music_detail ${i + 1}/${music_list.length}`;
+                    const music_item = music_list[i];
+                    const { music_id } = music_item;
+                    const localMusicDetailPkg = await fetch(`./scores/music_detail-${music_id}.json`);
+                    const localMusicDetail = await localMusicDetailPkg.json();
+                    //console.log(localMusicDetail)
+                    localMusicList.music_list[i].music_detail = localMusicDetail?.music_detail;
+                }
+
+                const tE = new Date();
+                document.getElementById("load-status").innerHTML = `Load done (${Math.floor(tE - tS)} ms)`;
+                plot_chart(localMusicList, localPlayerData);
+            } catch (e) {
+                document.getElementById("load-status").innerHTML = e.message || e;
+                console.error(e);
+            }
+        };
+
+        count_gc_main().catch(console.error);
+    </script>
+</body>
+
+</html>
