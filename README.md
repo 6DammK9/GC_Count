@@ -1,6 +1,6 @@
 ﻿# GC_Count: Groove Coaster personal score archive. #
 
-![preview.png](./public/img/preview.png)
+![preview.png](./public/img/preview.png) 
 
 ## Readme on 240330 ##
 
